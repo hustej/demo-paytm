@@ -1,5 +1,9 @@
 const mongoose = require("mongoose");
-mongoose.connect('mongodb+srv://tej:JPk1accRHBUaEUgR@cluster0.3spgj.mongodb.net/');
+require("dotenv").config();
+
+mongoose.connect(process.env.MONGO_URI) 
+  .then(() => console.log("DB Connected"))
+  .catch(err => console.error("MongoDB connection error:", err));
 
 const Schema = mongoose.Schema;
 
@@ -18,7 +22,6 @@ const userSchema = new Schema({
         required : true,
         trim : true,
         maxLength : 50
-
     },
     lastName : {
         type : String,
@@ -31,10 +34,10 @@ const userSchema = new Schema({
         required : true,
         minLength : 6
     }
-})
+});
 
 const User = mongoose.model('User' , userSchema);
 
-module.exports = {
+module.exports = { 
     User
-} ;
+ };
