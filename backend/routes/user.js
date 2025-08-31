@@ -2,9 +2,11 @@ const express = require("express");
 const router = express.Router();
 const zod = require("zod");
 const argon2 = require("argon2");
+
 const JWT_SECRET = require("../config")
 
 const { User } = require("../db")
+const { authMidlleware } = require("../middleware")
 
 const userSignupSchema = zod.strictObject({
     username : zod.string().email().trim().required(),
@@ -16,6 +18,12 @@ const userSignupSchema = zod.strictObject({
 const userSigninSchema = zod.strictObject({
     username : zod.string().email().required(),
     password : zod.string().required()
+})
+
+const updateUserInfo = zod.object({
+    password : zod.string().optional().trim().min(6),
+    firstname : zod.string().required().trim().max(50),
+    lastname : zod.string().required().trim().max(50),
 })
 
 router.post('/signup' , async (req , res) => {
@@ -119,6 +127,57 @@ router.post('/signin' , async (req , res) => {
 
 })
 
+router.put("/" , authMidlleware , async(res , req) => {
+    const validChanges = updateUserInfo.safeParse(req.body);
+
+    if(!validChanges.success){
+        return res.status(411).json({
+            message : "error while updating changes"
+        })
+    }
+
+    try {
+        await User.updateOne(req.body , {
+            _id : req.userID
+        })
+
+        res.stauts(200).json({
+            messsage : "Updated successfully"
+        })
+    }
+
+    catch(err){
+        res.status(411).json({
+            message : "error while updating changes"
+        })
+    }
+})
+
+router.get("/bulk" , (res , req) => {
+
+    const filterVal = req.query.filter || "";
+
+    const users = User.find({
+        $or : [{
+            firstname : {
+                "$regex" : filter,
+            },
+            lastname : {
+                "$regex" : filter
+            }
+        }]
+    })
+
+    res.json({
+        user : users.map(user => ({
+            username : user.username,
+            firstname : user.firstname,
+            lastname : user.lastname,
+            _id : user._id
+        }))
+    })
+
+})
 
 module.exports = {
     router
