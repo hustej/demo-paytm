@@ -6,6 +6,7 @@ const argon2 = require("argon2");
 const JWT_SECRET = require("../config")
 
 const { User } = require("../db")
+const { Account } = require("../db")
 const { authMidlleware } = require("../middleware")
 
 const userSignupSchema = zod.strictObject({
@@ -65,6 +66,13 @@ router.post('/signup' , async (req , res) => {
         lastname : req.body.lastname,
     })
     const userID = user._id;
+
+    const assignRandomBalance = (Math.random() * 10000) + 1
+
+    await Account.create({
+        userID : userID,
+        balance : assignRandomBalance
+    })
 
     const token = jwt.sign({
         userID
