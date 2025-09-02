@@ -2,37 +2,39 @@ const express = require("express");
 const router = express.Router();
 const zod = require("zod");
 const argon2 = require("argon2");
+const jwt = require("jsonwebtoken")
 
 const JWT_SECRET = require("../config")
 
 const { User } = require("../db")
 const { Account } = require("../db")
-const { authMidlleware } = require("../middleware")
+const { authMiddleware } = require("../middleware")
 
 const userSignupSchema = zod.strictObject({
-    username : zod.string().email().trim().required(),
-    firstname : zod.string().required().trim().max(50),
-    lastname : zod.string().required().trim().max(50),
-    password : zod.string().required().min(6),
+    username : zod.string().email().trim(),
+    firstname : zod.string().trim().max(50),
+    lastname : zod.string().trim().max(50),
+    password : zod.string().min(6),
 })
 
 const userSigninSchema = zod.strictObject({
-    username : zod.string().email().required(),
-    password : zod.string().required()
+    username : zod.string().email(),
+    password : zod.string()
 })
 
 const updateUserInfo = zod.object({
-    password : zod.string().optional().trim().min(6),
-    firstname : zod.string().required().trim().max(50),
-    lastname : zod.string().required().trim().max(50),
-})
+    password: zod.string().trim().min(6).optional(), 
+    firstname: zod.string().trim().max(50).optional(),
+    lastname: zod.string().trim().max(50).optional(),
+});
+
 
 router.post('/signup' , async (req , res) => {
-    const validUser = userSignupSchema.safeparse(req.body);
+    const validUser = userSignupSchema.safeParse(req.body);
 
     if(!validUser.success){
         return res.status(411).json({
-            message : "Email already taken / Incorrect inputs"
+            message : "Incorrect inputs"
         }) 
     }
 
@@ -135,37 +137,46 @@ router.post('/signin' , async (req , res) => {
 
 })
 
-router.put("/" , authMidlleware , async(res , req) => {
+router.put("/", authMiddleware, async (req, res) => {
     const validChanges = updateUserInfo.safeParse(req.body);
 
-    if(!validChanges.success){
+    if (!validChanges.success) {
         return res.status(411).json({
-            message : "error while updating changes"
-        })
+            message: "Error while updating changes",
+        });
+    }
+
+    const updateData = {};
+
+    if (req.body.password) {
+        updateData.password = await argon2.hash(req.body.password); // Hash the password if it's being updated
+    }
+    if (req.body.firstname) {
+        updateData.firstname = req.body.firstname;
+    }
+    if (req.body.lastname) {
+        updateData.lastname = req.body.lastname;
     }
 
     try {
-        await User.updateOne(req.body , {
-            _id : req.userID
-        })
+        await User.updateOne({ _id: req.userID }, { $set: updateData });
 
-        res.stauts(200).json({
-            messsage : "Updated successfully"
-        })
+        return res.status(200).json({
+            message: "Updated successfully",
+        });
+    } catch (err) {
+        return res.status(500).json({
+            message: "Error while updating changes",
+        });
     }
+});
 
-    catch(err){
-        res.status(411).json({
-            message : "error while updating changes"
-        })
-    }
-})
 
-router.get("/bulk" , (res , req) => {
+router.get("/bulk" , async (req , res) => {
 
-    const filterVal = req.query.filter || "";
+    const filter = req.query.filter || "";
 
-    const users = User.find({
+    const users = await User.find({
         $or : [{
             firstname : {
                 "$regex" : filter,
@@ -187,6 +198,4 @@ router.get("/bulk" , (res , req) => {
 
 })
 
-module.exports = {
-    router
-}
+module.exports = router

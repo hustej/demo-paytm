@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
+const {default : mongoose} = require("mongoose");
 
 const { Account } = require("../db")
 
-router.get("/balance" , async (res , req) => {
+router.get("/balance" , async (req , res) => {
     const userID = req.userID;
 
     const account = await Account.findOne({ userID : userID });
@@ -25,7 +26,7 @@ router.post("/transfer" , async (req,res) => {
     session.startTransaction();
     const {amount , to} = req.body;
 
-    const account = await Account.findOne({ userID : userID}).session(session);
+    const account = await Account.findOne({ userID : req.userID}).session(session);
 
     if(account.balance < amount || !account){
         await session.abortTransaction();
@@ -34,7 +35,7 @@ router.post("/transfer" , async (req,res) => {
         });
     }
 
-    const toAccount = Account.findOne({ userID : to}).session(session);
+    const toAccount = await Account.findOne({ userID : to}).session(session);
 
     if(!toAccount){
         await session.abortTransaction();
@@ -44,7 +45,7 @@ router.post("/transfer" , async (req,res) => {
     }
 
     await Account.updateOne({ userID : req.userID } , { $inc: { balance : -amount } }).session(session);
-})
+
     await Account.updateOne({ userID : to} , { $inc: {balance : amount } }).session(session);
 
     await session.commitTransaction();
@@ -52,7 +53,7 @@ router.post("/transfer" , async (req,res) => {
         message : "Tansefer successfull"
     })
 
+})
 
-module.exports = {
-    router
-}
+
+module.exports = router
